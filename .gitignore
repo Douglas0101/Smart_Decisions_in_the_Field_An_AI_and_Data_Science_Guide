@@ -1,137 +1,83 @@
-# Byte-compiled / optimized / DLL files
+# =============================================================================
+# Arquivos de Dados e Artefatos Grandes
+# =============================================================================
+# A regra mais importante: nunca comitar dados brutos ou processados.
+# Eles devem ser gerados pelo script de download ou pelo pipeline de ETL.
+/data/raw/
+/data/processed/
+/data/external/
+
+# Modelos treinados são binários e podem ser muito grandes.
+# Eles devem ser rastreados com MLflow ou DVC, não com Git.
+/models/
+*.pkl
+*.joblib
+*.h5
+*.onnx
+
+# =============================================================================
+# Arquivos de Cache e Gerados pelo Sistema
+# =============================================================================
+# Pastas e arquivos de cache do Python
 __pycache__/
-*.py[cod]
-*$py.class
+*.pyc
+*.pyo
+*.pyd
 
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib60/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds The PyInstaller bundle
-#  *.manifest
-#  *.spec
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py,cover
-.hypothesis/
-.pytest_cache/
-cover/
-
-# Translations
-*.mo
-*.pot
-*.po
-
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-target/
-
-# Jupyter Notebook
+# Cache do Jupyter Notebook
 .ipynb_checkpoints
-profile_default/
-ipython_config.py
 
-# Environments
-.env
-.venv
-env/
+# Cache do pytest (ferramenta de testes)
+.pytest_cache
+.coverage
+
+# Arquivos gerados pelo sistema operacional
+.DS_Store
+Thumbs.db
+
+# =============================================================================
+# Ambientes Virtuais e Dependências
+# =============================================================================
+# Ignorar a pasta do ambiente virtual
+.venv/
 venv/
+env/
 ENV/
-env.bak
-venv.bak
+*.env
+.env # Para variáveis de ambiente (contém senhas, chaves de API, etc.)
+*.egg-info/
+/dist/
+/build/
 
-# IDE-specific
+# =============================================================================
+# Relatórios e Visualizações
+# =============================================================================
+# Figuras, dashboards HTML e relatórios são artefatos gerados pelo código.
+# O código que os gera deve ser versionado, não os arquivos de saída.
+/reports/figures/
+/reports/final/*.html
+/reports/final/*.pdf
+*.html
+
+# =============================================================================
+# Ferramentas de MLOps e Data Version Control (DVC)
+# =============================================================================
+# O DVC mantém seu próprio cache, que não deve ir para o Git.
+.dvc/cache
+.dvc/tmp
+.dvc/plots
+
+# Logs de execução e do MLflow
+*.log
+mlruns/
+.mlflow-props
+
+# =============================================================================
+# Configurações de IDEs e Editores
+# =============================================================================
+# Ignorar configurações específicas do ambiente de desenvolvimento local.
 .idea/
 .vscode/
 *.sublime-project
 *.sublime-workspace
 nbproject/
-
-# OS-specific
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Data files - Descomente as linhas abaixo se os dados forem muito grandes
-# ou se você preferir que os usuários baixem/gerem os dados separadamente.
-# É uma boa prática manter arquivos de exemplo pequenos no repositório.
-# data/raw/
-# data/processed/
-# data/external/
-# data/future_scenarios_data/
-# !data/raw/example_data.csv # Exemplo de como manter um arquivo específico
-
-# Model files - Modelos treinados podem ser muito grandes.
-# models/current_predictions/
-# models/forecasts_2050/
-# !models/example_model.pkl # Exemplo de como manter um modelo pequeno
-
-# Reports - Se gerados a partir do código.
-# reports/
-
-# Log files
-logs/
-
-# Temporary files
-*.tmp
-*.bak
-*.swp
-*~
-
-# Outros
-.python-version
-.directory
