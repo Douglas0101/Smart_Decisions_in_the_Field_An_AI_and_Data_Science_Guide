@@ -1,0 +1,29 @@
+# Arquivo de dependências Python para o Projeto de Análise Integrada de Dados Agrícolas
+# Gerado de forma similar ao comando 'pip freeze > requirements.txt'
+
+# Bibliotecas essenciais para manipulação e análise de dados
+numpy==1.26.4
+pandas==2.2.2
+
+# Bibliotecas para visualização de dados
+matplotlib==3.8.4
+seaborn==0.13.2
+
+# Biblioteca para requisições HTTP (baixar dados das URLs)
+requests==2.32.3
+
+# Para desenvolvimento interativo e notebooks
+jupyterlab==4.2.5
+notebook==7.2.0
+ipykernel==6.29.4 # Frequentemente necessário para kernels Jupyter
+
+# Outras bibliotecas que podem ser adicionadas ao longo do projeto:
+scikit-learn==1.5.0
+plotly==5.22.0
+dask[complete]==2024.5.1
+pyspark==3.5.1
+sqlalchemy==2.0.30
+
+# Nota: As versões acima são exemplos e podem variar.
+# Recomenda-se sempre usar 'pip freeze > requirements.txt' no ambiente
+# virtual ativo para capturar as versões exatas do seu projeto.
