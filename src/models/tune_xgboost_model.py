@@ -2,94 +2,88 @@
 
 import pandas as pd
 import xgboost as xgb
+import optuna
 import logging
-from pathlib import Path
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import make_scorer, mean_squared_error
+from typing import Dict, Any
+from sklearn.metrics import mean_squared_error
 import numpy as np
 
-# --- Configuração ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-PROJECT_ROOT_PATH = Path(__file__).resolve().parent.parent.parent
-PROCESSED_DATA_DIR = PROJECT_ROOT_PATH / "data" / "processed"
+# Desativa o logging detalhado do Optuna para manter a saída limpa
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
 
 
-def tune_hyperparameters():
+class HyperparameterTuner:
     """
-    Carrega os dados, define um grid de hiperparâmetros e usa GridSearchCV
-    para encontrar a melhor combinação para o modelo XGBoost.
+    Encapsula a lógica de otimização de hiperparâmetros, utilizando a API nativa do XGBoost
+    para máxima compatibilidade e robustez.
     """
-    logging.info("--- INICIANDO PIPELINE DE OTIMIZAÇÃO DE HIPERPARÂMETROS ---")
 
-    # --- Carregando a Tabela Analítica Mestre ---
-    master_table_path = PROCESSED_DATA_DIR / 'master_analytical_table.parquet'
-    if not master_table_path.exists():
-        logging.error(f"Tabela analítica mestre não encontrada. Execute o pré-processamento.")
-        return
+    def __init__(self, df_train: pd.DataFrame, df_val: pd.DataFrame, target_col: str):
+        """
+        Inicializa o otimizador com os dados de treino e validação.
+        """
+        self.target_col = target_col
+        self.feature_cols = [col for col in df_train.columns if col not in [target_col, 'data']]
 
-    df = pd.read_parquet(master_table_path)
-    logging.info("Tabela analítica carregada.")
+        # [SOLUÇÃO AVANÇADA] Converte os DataFrames para DMatrix, o formato de dados nativo do XGBoost.
+        # Isto é feito uma vez para otimizar a performance durante os trials.
+        self.dtrain = xgb.DMatrix(df_train[self.feature_cols], label=df_train[self.target_col])
+        self.dval = xgb.DMatrix(df_val[self.feature_cols], label=df_val[self.target_col])
+        self.y_val = df_val[self.target_col]  # Mantemos y_val para o cálculo final do erro.
 
-    # --- Engenharia de Features (a mesma do script de treino) ---
-    df['mes'] = df['data'].dt.month
-    df['trimestre'] = df['data'].dt.quarter
-    df = pd.get_dummies(df, columns=['uf', 'especie_normalizada'], prefix=['uf', 'especie'])
-    df = df.sort_values('data').reset_index(drop=True)
+    def _objective(self, trial: optuna.Trial) -> float:
+        """
+        Função objetivo que o Optuna tentará minimizar.
+        """
+        # O espaço de busca de parâmetros permanece o mesmo
+        params = {
+            'objective': 'reg:squarederror',
+            'eval_metric': 'rmse',
+            'booster': 'gbtree',
+            'n_estimators': trial.suggest_int('n_estimators', 100, 1000),
+            'learning_rate': trial.suggest_float('learning_rate', 1e-3, 0.1, log=True),
+            'max_depth': trial.suggest_int('max_depth', 3, 10),
+            'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+            'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
+            'gamma': trial.suggest_float('gamma', 1e-8, 1.0, log=True),
+            'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+            'random_state': 42,
+            'n_jobs': -1
+        }
 
-    # --- Divisão Temporal ---
-    # Para o GridSearch, é importante usar uma validação cruzada que respeite a ordem temporal.
-    # No entanto, para um exemplo mais simples, vamos usar a mesma divisão de treino/teste.
-    # Em um cenário avançado, usaríamos TimeSeriesSplit do scikit-learn.
-    test_size = int(len(df) * 0.2)
-    split_index = len(df) - test_size
-    train_df = df.iloc[:split_index]
+        # [SOLUÇÃO AVANÇADA] Utiliza xgb.train (API nativa) em vez de model.fit()
+        # A API nativa aceita 'early_stopping_rounds' de forma direta e fiável.
+        bst = xgb.train(
+            params=params,
+            dtrain=self.dtrain,
+            num_boost_round=params['n_estimators'],
+            evals=[(self.dval, 'validation')],
+            early_stopping_rounds=50,
+            verbose_eval=False
+        )
 
-    X_train = train_df.drop(columns=['quantidade_cabecas', 'data', 'ano'])
-    y_train = train_df['quantidade_cabecas']
+        # Realiza previsões com o modelo treinado (Booster)
+        preds = bst.predict(self.dval)
+        rmse = np.sqrt(mean_squared_error(self.y_val, preds))
 
-    logging.info(f"Dados preparados para otimização com {len(X_train)} amostras.")
+        return rmse
 
-    # --- Definição do Grid de Parâmetros ---
-    # NOTA: Este é um grid pequeno para fins de demonstração. Em um projeto real,
-    # você exploraria uma gama maior de valores.
-    param_grid = {
-        'max_depth': [3, 5, 7],
-        'learning_rate': [0.01, 0.05, 0.1],
-        'n_estimators': [500, 1000],
-        'colsample_bytree': [0.7, 0.8]
-    }
+    def tune(self, n_trials: int = 50) -> Dict[str, Any]:
+        """
+        Executa o processo de otimização de hiperparâmetros.
+        """
+        logging.info(f"Iniciando a otimização de hiperparâmetros com {n_trials} trials (usando API nativa)...")
+        study = optuna.create_study(direction='minimize')
+        study.optimize(self._objective, n_trials=n_trials)
 
-    # --- Configuração do Modelo e do GridSearchCV ---
-    xgbr = xgb.XGBRegressor(objective='reg:squarederror', random_state=42, n_jobs=-1)
+        best_trial = study.best_trial
+        result = {
+            "best_score_rmse": round(best_trial.value, 4),
+            "best_params": best_trial.params
+        }
 
-    # Usamos RMSE como a métrica para otimizar. `neg_mean_squared_error` é o padrão,
-    # e o GridSearchCV tentará maximizá-lo (por isso o negativo).
-    rmse_scorer = make_scorer(lambda y_true, y_pred: np.sqrt(mean_squared_error(y_true, y_pred)),
-                              greater_is_better=False)
+        logging.info(f"Otimização concluída. Melhor RMSE: {result['best_score_rmse']}")
+        logging.info(f"Melhores parâmetros encontrados: {result['best_params']}")
 
-    grid_search = GridSearchCV(
-        estimator=xgbr,
-        param_grid=param_grid,
-        scoring=rmse_scorer,
-        cv=3,  # Usando validação cruzada de 3 folds. Para séries temporais, TimeSeriesSplit é mais indicado.
-        verbose=2  # Mostra o progresso
-    )
-
-    logging.info("Iniciando a busca em grade (Grid Search)... Isso pode demorar.")
-    grid_search.fit(X_train, y_train)
-
-    # --- Exibição dos Melhores Resultados ---
-    logging.info("Busca em grade concluída.")
-    print("\n=========================================================")
-    print("      MELHORES HIPERPARÂMETROS ENCONTRADOS")
-    print("=========================================================")
-    print(f"Melhor pontuação (RMSE): {-grid_search.best_score_:,.0f}")
-    print("Melhores parâmetros:")
-    for param, value in grid_search.best_params_.items():
-        print(f"  - {param}: {value}")
-    print("=========================================================")
-
-
-if __name__ == "__main__":
-    tune_hyperparameters()
-
+        return result

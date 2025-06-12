@@ -1,70 +1,93 @@
 # src/models/evaluate_model.py
 
+import pandas as pd
 import numpy as np
+import logging
+from typing import Tuple, Dict, Any
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
+# Configuração do logging para o módulo
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
 
-def calculate_forecasting_metrics(y_true, y_pred):
+
+class ModelEvaluator:
     """
-    Calcula um conjunto de métricas de erro para problemas de previsão de séries temporais.
+    Encapsula a lógica de avaliação para modelos de previsão de séries temporais.
 
-    Args:
-        y_true (array-like): Os valores reais (verdadeiros).
-        y_pred (array-like): Os valores previstos pelo modelo.
-
-    Returns:
-        dict: Um dicionário contendo as métricas calculadas.
+    Esta classe fornece métodos para dividir dados, avaliar a performance de
+    um modelo em um cenário específico e calcular métricas de erro.
     """
-    # Mean Absolute Error (MAE) - Erro médio absoluto. Fácil de interpretar.
-    mae = mean_absolute_error(y_true, y_pred)
 
-    # Mean Squared Error (MSE) - Erro quadrático médio. Penaliza mais os erros grandes.
-    mse = mean_squared_error(y_true, y_pred)
+    def __init__(self, validation_start_date: str):
+        """
+        Inicializa o avaliador com a data de corte para validação.
 
-    # Root Mean Squared Error (RMSE) - Raiz do erro quadrático médio.
-    # Está na mesma unidade da variável original, o que facilita a interpretação.
-    rmse = np.sqrt(mse)
+        Args:
+            validation_start_date (str): A data (formato 'YYYY-MM-DD') que marca o início
+                                         do conjunto de validação.
+        """
+        try:
+            self.validation_start_date = pd.to_datetime(validation_start_date)
+            logging.info(
+                f"ModelEvaluator inicializado com data de validação a partir de: {self.validation_start_date.date()}")
+        except ValueError:
+            logging.error(f"Formato de data inválido para 'validation_start_date'. Use 'YYYY-MM-DD'.")
+            raise
 
-    # Mean Absolute Percentage Error (MAPE) - Erro percentual médio absoluto.
-    # Cuidado: pode ser problemático se y_true tiver zeros.
-    # Adicionamos um pequeno epsilon para evitar divisão por zero.
-    epsilon = 1e-10
-    mape = np.mean(np.abs((y_true - y_pred) / (y_true + epsilon))) * 100
+    def split_data(self, df: pd.DataFrame, date_column: str) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Divide um DataFrame em conjuntos de treino e validação com base em uma data.
 
-    metrics = {
-        'mae': mae,
-        'mse': mse,
-        'rmse': rmse,
-        'mape': mape
-    }
+        Args:
+            df (pd.DataFrame): O DataFrame completo contendo os dados históricos.
+            date_column (str): O nome da coluna que contém as datas.
 
-    return metrics
+        Returns:
+            Tuple[pd.DataFrame, pd.DataFrame]: Uma tupla contendo o DataFrame de treino
+                                               e o DataFrame de validação.
+        """
+        df[date_column] = pd.to_datetime(df[date_column])
 
+        df_train = df[df[date_column] < self.validation_start_date].copy()
+        df_validation = df[df[date_column] >= self.validation_start_date].copy()
 
-def print_evaluation_report(metrics):
-    """
-    Imprime um relatório formatado com as métricas de avaliação.
-    """
-    print("\n--- Relatório de Avaliação do Modelo ---")
-    print(f"  MAE (Erro Absoluto Médio):      {metrics['mae']:,.0f}")
-    print(f"  RMSE (Raiz do Erro Quadrático): {metrics['rmse']:,.0f}")
-    print(f"  MAPE (Erro Percentual Médio):   {metrics['mape']:.2f}%")
-    print("-----------------------------------------")
-    print(f"  Interpretação: Em média, as previsões do modelo erram em {metrics['mae']:,.0f} unidades.")
+        logging.info(f"Dados divididos: {len(df_train)} registros para treino, {len(df_validation)} para validação.")
 
+        return df_train, df_validation
 
-# --- Bloco de Execução Principal ---
-if __name__ == '__main__':
-    print("\n--- Testando o Módulo de Avaliação ---")
+    def evaluate_scenario(self, y_true: pd.Series, y_pred: np.ndarray) -> Dict[str, float]:
+        """
+        Calcula as métricas de erro para um conjunto de previsões.
 
-    # Criando dados de exemplo
-    valores_reais = np.array([100, 110, 120, 115, 125, 130])
-    valores_previstos = np.array([102, 108, 123, 118, 123, 135])
+        Args:
+            y_true (pd.Series): Os valores reais (ground truth).
+            y_pred (np.ndarray): Os valores previstos pelo modelo (array NumPy).
 
-    print("\nDados de Exemplo:")
-    print(f"Reais:    {valores_reais}")
-    print(f"Previstos: {valores_previstos}")
+        Returns:
+            Dict[str, float]: Um dicionário contendo as métricas MAE, RMSE e MAPE.
+        """
+        # [CORREÇÃO] Altera a verificação de y_pred.empty para y_pred.size == 0,
+        # que é a forma correta de verificar se um array NumPy está vazio.
+        if y_true.empty or y_pred.size == 0:
+            logging.warning("Conjunto de dados de avaliação vazio. Pulando cálculo de métricas.")
+            return {}
 
-    # Calculando e imprimindo as métricas
-    metricas_exemplo = calculate_forecasting_metrics(valores_reais, valores_previstos)
-    print_evaluation_report(metricas_exemplo)
+        mae = mean_absolute_error(y_true, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+
+        y_true_no_zeros = y_true.replace(0, np.nan).dropna()
+        if len(y_true_no_zeros) == 0:
+            mape = np.inf
+        else:
+            # Garante que y_pred seja alinhado com os índices de y_true_no_zeros
+            y_pred_mape = pd.Series(y_pred, index=y_true.index)[y_true_no_zeros.index]
+            mape = (np.abs((y_true_no_zeros - y_pred_mape) / y_true_no_zeros)).mean() * 100
+
+        metrics = {
+            "MAE": round(mae, 4),
+            "RMSE": round(rmse, 4),
+            "MAPE (%)": round(mape, 4)
+        }
+
+        logging.info(f"Métricas calculadas: {metrics}")
+        return metrics

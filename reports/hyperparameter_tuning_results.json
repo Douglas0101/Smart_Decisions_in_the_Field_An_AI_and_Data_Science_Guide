@@ -1,0 +1,28 @@
+{
+    "abate_animais": {
+        "MT_BOVINOS": {
+            "best_score_rmse": 143483.495,
+            "best_params": {
+                "n_estimators": 637,
+                "learning_rate": 0.05174893591220712,
+                "max_depth": 5,
+                "subsample": 0.844425687662371,
+                "colsample_bytree": 0.8806030674467045,
+                "gamma": 6.413623215684259e-05,
+                "min_child_weight": 9
+            }
+        },
+        "PR_AVES": {
+            "best_score_rmse": 82159949.8286,
+            "best_params": {
+                "n_estimators": 907,
+                "learning_rate": 0.025291172200052087,
+                "max_depth": 4,
+                "subsample": 0.7584318186407681,
+                "colsample_bytree": 0.7620785091101993,
+                "gamma": 0.6339267028537567,
+                "min_child_weight": 1
+            }
+        }
+    }
+}
