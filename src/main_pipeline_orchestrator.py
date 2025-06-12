@@ -104,23 +104,35 @@ class PredictionPipeline:
             model = xgb.XGBRegressor(objective='reg:quantileerror', quantile_alpha=q, **params)
             model.fit(df_history_featured[feature_cols], df_history_featured[self.target_col])
 
-            # Previsão iterativa
-            df_dynamic = df_history_featured.copy()
-            future_dates = pd.date_range(start=df_dynamic[self.date_col].iloc[-1], periods=horizon_months + 1,
-                                         freq='MS')[1:]
+            # Previsão iterativa OTIMIZADA
+            # Os lags usados para previsão são fixados a partir do último ponto do histórico.
+            # Apenas as features de data (ano, mês) são atualizadas a cada passo da previsão.
+            last_historical_features_dict = df_history_featured[feature_cols].iloc[-1].to_dict()
+
+            future_dates = pd.date_range(
+                start=df_history_featured[self.date_col].iloc[-1], # Baseado no último timestamp do histórico
+                periods=horizon_months + 1, # +1 porque a primeira data é o start, queremos N períodos *após*
+                freq='MS'
+            )[1:] # [1:] para excluir a data de início, que já está no histórico
 
             predictions = []
-            for date in future_dates:
-                last_known_features = df_dynamic[feature_cols].iloc[-1].to_dict()
-                pred_input = pd.DataFrame([last_known_features], columns=feature_cols)
+            current_features_for_step = last_historical_features_dict.copy()
 
-                prediction = model.predict(pred_input)[0]
+            for current_pred_date in future_dates:
+                # Atualizar features de data para o passo de previsão atual
+                current_features_for_step['ano'] = current_pred_date.year
+                current_features_for_step['mes'] = current_pred_date.month
+                # Se houver outras features baseadas em data (ex: trimestre), atualize-as aqui também.
+                # Ex: if 'trimestre' in current_features_for_step:
+                # current_features_for_step['trimestre'] = current_pred_date.quarter
+
+                pred_input_df = pd.DataFrame([current_features_for_step], columns=feature_cols)
+                prediction = model.predict(pred_input_df)[0]
                 predictions.append(prediction)
 
-                new_row = pred_input.iloc[0].to_dict()
-                new_row[self.date_col] = date
-                new_row[self.target_col] = prediction
-                df_dynamic = pd.concat([df_dynamic, pd.DataFrame([new_row])], ignore_index=True)
+                # Nesta estratégia, as features de lag em current_features_for_step
+                # não são atualizadas com a 'prediction' atual. Elas permanecem as mesmas
+                # do último ponto do histórico. As colunas dummy também não mudam.
 
             forecasts[q] = pd.Series(predictions, index=future_dates)
 
