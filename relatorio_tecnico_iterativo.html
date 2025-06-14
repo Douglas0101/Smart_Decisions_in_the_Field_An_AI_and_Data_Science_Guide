@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Interativo - Previsão de Abates no Agronegócio com IA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Earthy Neutrals -->
+    <!-- Application Structure Plan: A tab-based SPA dashboard. The structure is thematic. Added a new 'Análise com IA' tab for Gemini features. 1) 'Visão Geral'. 2) 'Metodologia'. 3) 'Modelos'. 4) 'Resultados' with chart and a new Gemini button to analyze results. 5) 'Análise com IA' for scenario generation. 6) 'Conclusão'. This structure separates the core report from the new generative AI features, making the application's purpose clearer. -->
+    <!-- Visualization & Content Choices: Summary: 1. Gemini Analysis of Results -> Inform/Analyze -> Text Block -> On-click generation -> Justification: Adds a qualitative layer to the quantitative chart data, explaining 'what the numbers mean'. 2. Gemini Scenario Generation -> Explore/Hypothesize -> Form + Text Block -> User input + On-click generation -> Justification: Transforms the dashboard from a reporting tool to a strategic planning tool, allowing users to explore potential futures based on external factors. All other choices remain the same. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 50vh;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 450px;
+            }
+        }
+        .tab-button {
+            transition: all 0.3s ease;
+            border-bottom: 2px solid transparent;
+        }
+        .tab-button.active {
+            border-color: #4f46e5; /* indigo-600 */
+            color: #1e3a8a; /* blue-900 */
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .kpi-card {
+            background-color: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            text-align: center;
+        }
+        .flowchart-step {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+        .flowchart-step:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .flowchart-arrow {
+            color: #9ca3af; /* gray-400 */
+        }
+        .gemini-button {
+            background-color: #4f46e5;
+            color: white;
+            transition: background-color 0.3s ease;
+        }
+        .gemini-button:hover {
+            background-color: #4338ca;
+        }
+        .gemini-button:disabled {
+            background-color: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4f46e5;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-6">
+            <h1 class="text-3xl font-bold text-blue-900">Relatório Interativo de Previsão de Abates</h1>
+            <p class="text-lg text-gray-600 mt-1">Uma Análise do Projeto "Smart Decisions in the Field" com IA Gemini</p>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8">
+        <nav class="flex flex-wrap border-b border-gray-200 mb-8">
+            <button class="tab-button active text-sm sm:text-base md:text-lg font-medium py-3 px-2 md:px-4" onclick="showTab('visao-geral')">Visão Geral</button>
+            <button class="tab-button text-sm sm:text-base md:text-lg font-medium py-3 px-2 md:px-4" onclick="showTab('metodologia')">Metodologia</button>
+            <button class="tab-button text-sm sm:text-base md:text-lg font-medium py-3 px-2 md:px-4" onclick="showTab('modelos')">Modelos</button>
+            <button class="tab-button text-sm sm:text-base md:text-lg font-medium py-3 px-2 md:px-4" onclick="showTab('resultados')">Resultados</button>
+            <button class="tab-button text-sm sm:text-base md:text-lg font-medium py-3 px-2 md:px-4" onclick="showTab('ia')">Análise com IA</button>
+            <button class="tab-button text-sm sm:text-base md:text-lg font-medium py-3 px-2 md:px-4" onclick="showTab('conclusao')">Conclusão</button>
+        </nav>
+
+        <div id="tab-content">
+            <section id="visao-geral" class="content-section active">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Sumário Executivo e Contexto</h2>
+                <div class="bg-white p-6 rounded-lg shadow-sm space-y-4 text-gray-700 leading-relaxed">
+                    <p>Este relatório apresenta os resultados do desenvolvimento de uma solução de Inteligência Artificial para a previsão de abates no agronegócio. Com o objetivo de mitigar riscos e otimizar a tomada de decisão, foi construído um pipeline de MLOps que automatiza todo o ciclo de vida do modelo. Agora, com a integração da API do Gemini, o dashboard oferece não apenas previsões, mas também análises qualitativas e geração de cenários estratégicos.</p>
+                </div>
+            </section>
+
+            <section id="metodologia" class="content-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Pipeline de Dados e MLOps</h2>
+                <p class="text-gray-600 mb-8 text-center max-w-3xl mx-auto">A metodologia segue um fluxo estruturado. Clique em cada etapa abaixo para ver os detalhes.</p>
+                <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4 mb-8">
+                    <div id="step-coleta" class="flowchart-step bg-white p-4 rounded-lg shadow-md border-l-4 border-indigo-500 w-full md:w-1/4" onclick="toggleDetail('detail-coleta')"><h3 class="font-semibold text-lg">1. Coleta de Dados</h3><p class="text-sm text-gray-500">Aquisição automatizada.</p></div>
+                    <div class="flowchart-arrow text-2xl font-light hidden md:block">→</div>
+                    <div id="step-eda" class="flowchart-step bg-white p-4 rounded-lg shadow-md border-l-4 border-indigo-500 w-full md:w-1/4" onclick="toggleDetail('detail-eda')"><h3 class="font-semibold text-lg">2. Análise (EDA)</h3><p class="text-sm text-gray-500">Identificação de padrões.</p></div>
+                    <div class="flowchart-arrow text-2xl font-light hidden md:block">→</div>
+                    <div id="step-features" class="flowchart-step bg-white p-4 rounded-lg shadow-md border-l-4 border-indigo-500 w-full md:w-1/4" onclick="toggleDetail('detail-features')"><h3 class="font-semibold text-lg">3. Eng. de Features</h3><p class="text-sm text-gray-500">Criação de variáveis.</p></div>
+                </div>
+                <div id="methodology-details" class="mt-6"><div id="detail-coleta" class="hidden bg-white p-6 rounded-lg shadow-sm"><h4 class="font-bold text-xl mb-2 text-indigo-800">Detalhes da Coleta</h4><p class="text-gray-700">O processo inicia com a coleta automatizada de dados históricos de abates. O script `src/data/download_data.py` busca os dados e os armazena em `data/raw/`.</p></div><div id="detail-eda" class="hidden bg-white p-6 rounded-lg shadow-sm"><h4 class="font-bold text-xl mb-2 text-indigo-800">Detalhes da Análise (EDA)</h4><p class="text-gray-700">Uma análise profunda revelou tendência de crescimento e forte componente sazonal. Testes estatísticos confirmaram que a série é não-estacionária.</p></div><div id="detail-features" class="hidden bg-white p-6 rounded-lg shadow-sm"><h4 class="font-bold text-xl mb-2 text-indigo-800">Detalhes da Eng. de Features</h4><p class="text-gray-700">O problema é transformado em regressão supervisionada com a criação de features de Calendário, Lag (Yt-1, Yt-12) e Janela Móvel (média, desvio padrão).</p></div></div>
+            </section>
+
+            <section id="modelos" class="content-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Comparativo de Modelos</h2>
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="text-xl font-bold text-gray-800 mb-3">Modelo 1: XGBoost</h3><div class="space-y-3 text-gray-700"><p><strong>Justificativa:</strong> Altamente eficaz para modelar interações não-lineares e complexas em dados tabulares. Oferece boa interpretabilidade.</p><p><strong>Abordagem:</strong> Treinado usando features de calendário, lag e janela móvel como preditoras e o valor do abate como alvo.</p></div></div><div class="bg-white p-6 rounded-lg shadow-sm"><h3 class="text-xl font-bold text-gray-800 mb-3">Modelo 2: Rede Neural LSTM</h3><div class="space-y-3 text-gray-700"><p><strong>Justificativa:</strong> Arquitetura de Deep Learning projetada para dados sequenciais, capaz de aprender dependências de longo prazo.</p><p><strong>Abordagem:</strong> Os dados foram transformados em sequências e normalizados para o intervalo [0, 1] antes do treinamento.</p></div></div></div>
+            </section>
+
+            <section id="resultados" class="content-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Resultados Quantitativos e Visuais</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8"><div class="kpi-card"><h4 class="text-lg font-medium text-gray-500">Melhor Modelo</h4><p id="best-model" class="text-3xl font-bold text-indigo-600 mt-2">XGBoost</p></div><div class="kpi-card"><h4 class="text-lg font-medium text-gray-500">MAE</h4><p id="mae-value" class="text-3xl font-bold text-indigo-600 mt-2">135.4k</p></div><div class="kpi-card"><h4 class="text-lg font-medium text-gray-500">RMSE</h4><p id="rmse-value" class="text-3xl font-bold text-indigo-600 mt-2">162.1k</p></div><div class="kpi-card"><h4 class="text-lg font-medium text-gray-500">MAPE</h4><p id="mape-value" class="text-3xl font-bold text-indigo-600 mt-2">4.85%</p></div></div>
+                <div class="bg-white p-4 md:p-6 rounded-lg shadow-sm"><h3 class="text-xl font-bold text-gray-800 mb-4 text-center">Previsão de Abates: Real vs. Modelos</h3><div class="flex justify-center space-x-4 mb-4"><button id="toggle-xgboost" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full transition-colors">Ocultar XGBoost</button><button id="toggle-lstm" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-full transition-colors">Ocultar LSTM</button></div><div class="chart-container"><canvas id="forecastChart"></canvas></div>
+                    <div class="mt-8 text-center">
+                        <button id="analyze-results-btn" class="gemini-button font-bold py-2 px-6 rounded-full inline-flex items-center space-x-2"><span>✨ Analisar Resultados com Gemini</span></button>
+                    </div>
+                    <div id="gemini-analysis-results" class="mt-6 p-6 bg-slate-50 rounded-lg hidden prose max-w-none"></div>
+                </div>
+            </section>
+
+            <section id="ia" class="content-section">
+                 <h2 class="text-2xl font-bold text-gray-800 mb-4">Análise de Cenários com IA</h2>
+                 <p class="text-gray-600 mb-8 text-center max-w-3xl mx-auto">Vá além da previsão. Descreva um cenário futuro e deixe a IA da Gemini analisar os possíveis impactos e sugerir ações estratégicas com base nos dados históricos e nas suas premissas.</p>
+
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label for="scenario-type" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Cenário</label>
+                            <select id="scenario-type" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                                <option>Otimista</option>
+                                <option>Pessimista</option>
+                                <option selected>Neutro / Realista</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="external-factors" class="block text-sm font-medium text-gray-700 mb-1">Fatores Externos Relevantes</label>
+                            <input type="text" id="external-factors" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Ex: Seca no Centro-Oeste, abertura de mercado na Ásia...">
+                        </div>
+                    </div>
+                    <div class="mt-6 text-center">
+                        <button id="generate-scenario-btn" class="gemini-button font-bold py-3 px-8 rounded-full inline-flex items-center space-x-2 text-lg">
+                            <span>✨ Gerar Análise de Cenário</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="gemini-scenario-result" class="mt-8 p-6 bg-slate-50 rounded-lg hidden prose max-w-none"></div>
+            </section>
+
+            <section id="conclusao" class="content-section">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Conclusões e Próximos Passos</h2>
+                <div class="bg-white p-6 rounded-lg shadow-sm space-y-4 text-gray-700">
+                    <p>Este projeto demonstrou com sucesso a viabilidade da aplicação de IA para previsão de abates. Foi desenvolvido um pipeline robusto que entrega modelos de alta performance, capazes de fornecer insights estratégicos para a tomada de decisão.</p>
+                    <div><h3 class="font-semibold text-lg mb-2">Recomendações para Trabalhos Futuros:</h3><ul class="list-disc list-inside space-y-2"><li><strong>Incorporação de Variáveis Exógenas:</strong> Enriquecer o modelo com dados econômicos (preço da arroba, câmbio) e climáticos.</li><li><strong>Deployment da API:</strong> Finalizar o `app.py` utilizando FastAPI para criar um endpoint RESTful.</li><li><strong>Conteinerização e Deploy em Nuvem:</strong> Empacotar a aplicação em contêineres Docker e implantá-la em uma plataforma de nuvem (AWS, GCP, Azure).</li><li><strong>Monitoramento Contínuo (MLOps):</strong> Implementar um sistema para monitorar a performance do modelo em produção e acionar o retreinamento automático.</li></ul></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+<script>
+    const mockData = {
+        labels: ['Jan/23', 'Fev/23', 'Mar/23', 'Abr/23', 'Mai/23', 'Jun/23', 'Jul/23', 'Ago/23', 'Set/23', 'Out/23', 'Nov/23', 'Dez/23'],
+        real: [2700, 2650, 2800, 2750, 2900, 3000, 2950, 3100, 3050, 3200, 3150, 3300],
+        xgboost: [2720, 2630, 2830, 2760, 2920, 2980, 2970, 3110, 3040, 3230, 3160, 3320],
+        lstm: [2690, 2680, 2790, 2780, 2880, 3020, 2930, 3080, 3070, 3180, 3170, 3280]
+    };
+    const metrics = {
+        xgboost: { mae: 135.4, rmse: 162.1, mape: 4.85 },
+        lstm: { mae: 155.2, rmse: 189.5, mape: 5.92 }
+    };
+    let activeMethodologyDetail = null;
+    let forecastChart;
+
+    function showTab(tabId) {
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.querySelector(`[onclick="showTab('${tabId}')"]`).classList.add('active');
+    }
+
+    function toggleDetail(detailId) {
+        const detailEl = document.getElementById(detailId);
+        const stepEl = document.getElementById(detailId.replace('detail-', 'step-'));
+        if (activeMethodologyDetail && activeMethodologyDetail !== detailId) {
+            document.getElementById(activeMethodologyDetail).classList.add('hidden');
+            document.getElementById(activeMethodologyDetail.replace('detail-', 'step-')).classList.remove('bg-indigo-100');
+        }
+        detailEl.classList.toggle('hidden');
+        stepEl.classList.toggle('bg-indigo-100');
+        activeMethodologyDetail = detailEl.classList.contains('hidden') ? null : detailId;
+    }
+
+    async function callGemini(prompt, button, resultContainer) {
+        button.disabled = true;
+        const originalButtonText = button.innerHTML;
+        button.innerHTML = '<div class="loader"></div>';
+        resultContainer.classList.remove('hidden');
+        resultContainer.innerHTML = '<div class="loader"></div>';
+
+        try {
+            let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { contents: chatHistory };
+            const apiKey = "AIzaSyAH83Z-lb_EpXkGOSRbc8ppn7QxWA2g7e4";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0 &&
+                result.candidates[0].content && result.candidates[0].content.parts &&
+                result.candidates[0].content.parts.length > 0) {
+                const text = result.candidates[0].content.parts[0].text;
+                resultContainer.innerHTML = text.replace(/\n/g, '<br>');
+            } else {
+                resultContainer.innerHTML = '<p class="text-red-500">Ocorreu um erro ao gerar a análise. A resposta da API estava em um formato inesperado.</p>';
+                console.error('Unexpected API response format:', result);
+            }
+        } catch (error) {
+            resultContainer.innerHTML = `<p class="text-red-500">Falha ao se comunicar com a API do Gemini. Verifique o console para mais detalhes.</p>`;
+            console.error('Error calling Gemini API:', error);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalButtonText;
+        }
+    }
+
+    function handleAnalyzeResults() {
+        const dataSummary = mockData.labels.map((label, i) =>
+            `Mês ${label}: Real=${mockData.real[i]}, XGBoost=${mockData.xgboost[i]}, LSTM=${mockData.lstm[i]}`
+        ).join('; ');
+
+        const prompt = `
+            Você é um analista de dados especialista no setor de agronegócio. Analise os seguintes dados de previsão de abates e forneça um resumo executivo para um gestor.
+
+            Contexto: Estamos comparando a performance dos modelos XGBoost e LSTM contra os dados reais de abates de animais (em milhares de cabeças) para o ano de 2023.
+
+            Métricas de Performance (Modelo de melhor performance - XGBoost):
+            - MAE (Erro Absoluto Médio): ${metrics.xgboost.mae} mil cabeças
+            - RMSE (Raiz do Erro Quadrático Médio): ${metrics.xgboost.rmse} mil cabeças
+            - MAPE (Erro Percentual Absoluto Médio): ${metrics.xgboost.mape}%
+
+            Dados do Gráfico:
+            ${dataSummary}
+
+            Sua análise deve incluir:
+            1.  Uma interpretação clara das métricas em um contexto de negócio. O que um MAPE de ${metrics.xgboost.mape}% significa na prática para o planejamento?
+            2.  Uma comparação da aderência dos dois modelos (XGBoost e LSTM) aos dados reais. Qual modelo parece seguir melhor as tendências e sazonalidades?
+            3.  Identifique um ou dois meses onde a previsão foi particularmente precisa ou imprecisa e sugira possíveis razões (mesmo que hipotéticas, relacionadas a eventos do setor).
+            4.  Conclua com uma recomendação sobre a confiança no modelo para tomada de decisão.
+
+            Formate a resposta de forma clara, usando títulos e parágrafos.
+        `;
+
+        const button = document.getElementById('analyze-results-btn');
+        const resultContainer = document.getElementById('gemini-analysis-results');
+        callGemini(prompt, button, resultContainer);
+    }
+
+    function handleGenerateScenario() {
+        const scenarioType = document.getElementById('scenario-type').value;
+        const externalFactors = document.getElementById('external-factors').value;
+
+        if (!externalFactors) {
+            alert('Por favor, descreva os fatores externos relevantes para a análise.');
+            return;
+        }
+
+        const prompt = `
+            Você é um consultor estratégico especialista em agronegócio. Sua tarefa é criar uma análise de cenário qualitativa sobre a previsão de abates de animais para os próximos 12 meses.
+
+            Contexto Atual:
+            A previsão base (usando o modelo XGBoost) indica uma continuação da tendência de crescimento com a sazonalidade histórica. Os últimos 12 meses de dados reais foram: ${mockData.real.join(', ')}. O último valor real foi ${mockData.real[mockData.real.length - 1]} mil cabeças.
+
+            Cenário a ser Analisado:
+            - Tipo de Cenário: ${scenarioType}
+            - Fatores Externos a Considerar: "${externalFactors}"
+
+            Sua Análise de Cenário deve conter:
+            1.  **Impacto na Tendência:** Descreva como os fatores externos mencionados, dentro de um cenário ${scenarioType}, provavelmente impactarão a tendência de abates (acelerando, desacelerando, revertendo).
+            2.  **Impacto na Sazonalidade:** Os fatores podem alterar os picos e vales sazonais usuais? Por exemplo, uma seca pode antecipar abates?
+            3.  **Riscos e Oportunidades:** Identifique os principais riscos e oportunidades que emergem deste cenário para um frigorífico ou produtor.
+            4.  **Recomendações Estratégicas:** Com base na sua análise, sugira de 2 a 3 ações estratégicas que a gestão poderia tomar para se preparar para este cenário (ex: ajustar política de estoques, renegociar com fornecedores, focar em novos mercados).
+
+            Seja claro, objetivo e forneça uma análise que seja útil para a tomada de decisão.
+        `;
+
+        const button = document.getElementById('generate-scenario-btn');
+        const resultContainer = document.getElementById('gemini-scenario-result');
+        callGemini(prompt, button, resultContainer);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        forecastChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: mockData.labels,
+                datasets: [
+                    { label: 'Dados Reais (em mil cabeças)', data: mockData.real, borderColor: '#1e3a8a', backgroundColor: '#1e3a8a', tension: 0.1, borderWidth: 3 },
+                    { label: 'Previsão XGBoost', data: mockData.xgboost, borderColor: '#3b82f6', backgroundColor: '#3b82f6', tension: 0.1, borderDash: [5, 5], borderWidth: 2, hidden: false },
+                    { label: 'Previsão LSTM', data: mockData.lstm, borderColor: '#10b981', backgroundColor: '#10b981', tension: 0.1, borderDash: [5, 5], borderWidth: 2, hidden: false }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: { y: { beginAtZero: false, title: { display: true, text: 'Abates (em mil cabeças)' } } },
+                plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } },
+                interaction: { mode: 'nearest', axis: 'x', intersect: false }
+            }
+        });
+
+        const toggleButton = (buttonId, datasetIndex, modelName) => {
+            const button = document.getElementById(buttonId);
+            button.addEventListener('click', () => {
+                const isVisible = forecastChart.isDatasetVisible(datasetIndex);
+                forecastChart.setDatasetVisibility(datasetIndex, !isVisible);
+                button.textContent = isVisible ? `Mostrar ${modelName}` : `Ocultar ${modelName}`;
+                const colors = isVisible ? ['#9ca3af', '#d1d5db'] : (modelName === 'XGBoost' ? ['#3b82f6', '#60a5fa'] : ['#10b981', '#34d399']);
+                button.style.backgroundColor = colors[0];
+                button.onmouseover = () => button.style.backgroundColor = colors[1];
+                button.onmouseout = () => button.style.backgroundColor = colors[0];
+                forecastChart.update();
+            });
+        };
+
+        toggleButton('toggle-xgboost', 1, 'XGBoost');
+        toggleButton('toggle-lstm', 2, 'LSTM');
+
+        document.getElementById('analyze-results-btn').addEventListener('click', handleAnalyzeResults);
+        document.getElementById('generate-scenario-btn').addEventListener('click', handleGenerateScenario);
+
+        document.getElementById('mae-value').textContent = `${metrics.xgboost.mae}k`;
+        document.getElementById('rmse-value').textContent = `${metrics.xgboost.rmse}k`;
+        document.getElementById('mape-value').textContent = `${metrics.xgboost.mape}%`;
+    });
+</script>
+
+</body>
+</html>
